@@ -1,0 +1,64 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+venv_broken/
+.venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Data
+data/embeddings.db
+data/chroma_db/
+data/generated_images/
+data/documents/*
+!data/documents/.gitkeep
+*.ogg
+*.wav
+*.mp3
+
+# Logs
+*.log
+
+# Local duplicate/backup files
+* (2).*
+*.bak
+*.backup
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
