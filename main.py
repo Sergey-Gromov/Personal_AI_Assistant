@@ -26,24 +26,39 @@ async def setup_bot():
         from rag.index import vector_index
         from config import DOCUMENTS_DIR
         
-        # Check if documents directory has files
-        docs = list(DOCUMENTS_DIR.glob('*'))
-        docs = [d for d in docs if d.is_file() and d.suffix in ['.pdf', '.txt', '.md']]
+        # Check if documents directory has supported files
+        supported_extensions = {'.pdf', '.txt', '.md'}
+        docs = [
+            d for d in DOCUMENTS_DIR.rglob('*')
+            if d.is_file() and d.suffix.lower() in supported_extensions
+        ]
         
         if docs:
-            # Avoid re-embedding on every startup if index already exists.
-            # This keeps startup responsive when API is temporarily unavailable.
+            # Reindex only when the persisted Chroma index does not match the files on disk.
             stats = vector_index.get_stats()
             indexed_chunks = stats.get("total_documents", 0) if isinstance(stats, dict) else 0
+            indexed_sources = set(stats.get("indexed_sources", [])) if isinstance(stats, dict) else set()
+            document_sources = {doc.name for doc in docs}
             
-            if isinstance(indexed_chunks, int) and indexed_chunks > 0:
+            if (
+                isinstance(indexed_chunks, int)
+                and indexed_chunks > 0
+                and indexed_sources == document_sources
+            ):
                 logger.info(
                     f"Found {len(docs)} documents, existing index has {indexed_chunks} chunks. "
-                    "Skipping startup reindex."
+                    "Index sources match documents, skipping startup reindex."
                 )
             else:
-                logger.info(f"Found {len(docs)} documents, indexing...")
-                count = vector_index.index_documents_directory(force_reindex=False)
+                missing_sources = sorted(document_sources - indexed_sources)
+                stale_sources = sorted(indexed_sources - document_sources)
+                if missing_sources:
+                    logger.info("Documents missing from index: %s", ", ".join(missing_sources))
+                if stale_sources:
+                    logger.info("Stale index sources not found on disk: %s", ", ".join(stale_sources))
+
+                logger.info(f"Found {len(docs)} documents, rebuilding RAG index...")
+                count = vector_index.index_documents_directory(force_reindex=True)
                 logger.info(f"Indexed {count} document chunks")
         else:
             logger.info("No documents found in data/documents/")

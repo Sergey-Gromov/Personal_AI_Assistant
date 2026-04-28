@@ -173,12 +173,10 @@ class VectorIndex:
     def clear_index(self):
         """Clear the entire vector store."""
         try:
-            # Delete and recreate
-            import shutil
-            if self.persist_directory.exists():
-                shutil.rmtree(self.persist_directory)
-            
             self.persist_directory.mkdir(parents=True, exist_ok=True)
+            if self.vectorstore is not None:
+                self.vectorstore.delete_collection()
+
             self._load_or_create_vectorstore()
             
             logger.info("Vector store cleared")
@@ -198,15 +196,32 @@ class VectorIndex:
             # ChromaDB collection stats
             collection = self.vectorstore._collection
             count = collection.count()
+            indexed_sources = self.get_indexed_sources()
             
             return {
                 "total_documents": count,
+                "indexed_sources": sorted(indexed_sources),
                 "persist_directory": str(self.persist_directory)
             }
             
         except Exception as e:
             logger.error(f"Error getting stats: {e}")
             return {"error": str(e)}
+
+    def get_indexed_sources(self) -> set[str]:
+        """Return source filenames currently stored in the vector index."""
+        collection = self.vectorstore._collection
+        count = collection.count()
+        if count == 0:
+            return set()
+
+        items = collection.get(include=["metadatas"], limit=count)
+        metadatas = items.get("metadatas", [])
+        return {
+            metadata.get("source")
+            for metadata in metadatas
+            if metadata and metadata.get("source")
+        }
 
 
 # Global index instance
