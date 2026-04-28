@@ -1,323 +1,167 @@
-# Настройка ProxyAPI для работы в России
+# Настройка OpenAI API и SOCKS-прокси
 
-## 🌍 Что такое ProxyAPI?
+Проект использует OpenAI-совместимый API. Endpoint и прокси настраиваются через `.env`, без правок Python-кода.
 
-[ProxyAPI](https://proxyapi.ru) — это универсальное решение для доступа к API ведущих сервисов в области искусственного интеллекта (OpenAI, Anthropic, Google) из России **без VPN и блокировок**.
+## Основная схема
 
-### Преимущества:
-- ✅ **Без VPN** - работает напрямую из России
-- ✅ **Оплата в рублях** - удобная оплата российскими картами
-- ✅ **Стабильность** - запросы идут через прокси в Европе
-- ✅ **Совместимость** - полная совместимость с OpenAI API
-- ✅ **Все сервисы** - GPT, DALL-E, Whisper, TTS работают одинаково
+- `OPENAI_API_KEY` - ключ OpenAI или OpenAI-совместимого провайдера.
+- `OPENAI_API_BASE` - базовый URL API, например `https://api.openai.com/v1`.
+- `SOCKS_PROXY_URL` - локальный SOCKS5-прокси, например sing-box на `127.0.0.1:1080`.
+- `HTTP_PROXY` / `HTTPS_PROXY` - стандартные переменные окружения для библиотек, которые читают proxy из окружения.
+- `TELEGRAM_PROXY_URL` - отдельный proxy для Telegram, если он нужен. Если не задан, Telegram использует `SOCKS_PROXY_URL`.
 
----
+## Direct OpenAI без прокси
 
-## 🚀 Быстрая настройка
-
-### Шаг 1: Регистрация на ProxyAPI
-
-1. Перейдите на [proxyapi.ru](https://proxyapi.ru)
-2. Зарегистрируйтесь
-3. Пополните баланс (оплата в рублях)
-4. Создайте API ключ в разделе "Ключи API"
-
-⚠️ **Важно**: Ключ можно увидеть только один раз при создании!
-
-### Шаг 2: Настройка проекта
-
-В файле `.env` измените/добавьте:
+Подходит для VPS в странах, где OpenAI и Telegram доступны напрямую.
 
 ```env
-# ProxyAPI ключ (вместо OpenAI ключа)
-OPENAI_API_KEY=ваш-ключ-proxyapi
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token-here
+OPENAI_API_KEY=sk-your-openai-api-key-here
+OPENAI_API_BASE=https://api.openai.com/v1
 
-# Использовать ProxyAPI (по умолчанию true)
-USE_PROXYAPI=true
+SOCKS_PROXY_URL=
+HTTP_PROXY=
+HTTPS_PROXY=
+
+TELEGRAM_REQUEST_TIMEOUT=90
 ```
 
-### Шаг 3: Запустите бота
+После изменения `.env` перезапустите бота:
 
 ```bash
 python main.py
 ```
 
-Готово! Бот теперь работает через ProxyAPI 🎉
+## OpenAI через локальный SOCKS5
 
----
-
-## ⚙️ Конфигурация
-
-### Переменные окружения (.env)
+Если OpenAI недоступен напрямую, поднимите локальный SOCKS5-прокси, например sing-box на `127.0.0.1:1080`, и укажите:
 
 ```env
-# API ключ от ProxyAPI
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENAI_API_BASE=https://api.openai.com/v1
 
-# Использовать ProxyAPI (true/false)
-USE_PROXYAPI=true
-
-# Остальные настройки остаются прежними
-TELEGRAM_BOT_TOKEN=your-telegram-token
+SOCKS_PROXY_URL=socks5://127.0.0.1:1080
+HTTP_PROXY=socks5://127.0.0.1:1080
+HTTPS_PROXY=socks5://127.0.0.1:1080
 ```
 
-### Автоматическое определение
+Эта настройка используется для:
 
-Проект автоматически определяет использование ProxyAPI через параметр `USE_PROXYAPI`:
+- текстовых запросов через OpenAI SDK;
+- Vision, Whisper и TTS через OpenAI SDK;
+- RAG embeddings через `langchain-openai`;
+- DALL-E-запросов и скачивания изображений через `aiohttp`;
+- Telegram Bot API, если `TELEGRAM_PROXY_URL` не задан отдельно.
 
-- `USE_PROXYAPI=true` → `https://api.proxyapi.ru/openai/v1`
-- `USE_PROXYAPI=false` → `https://api.openai.com/v1`
+## Telegram напрямую, OpenAI через прокси
 
----
+По умолчанию `TELEGRAM_PROXY_URL` берется из `SOCKS_PROXY_URL`, поэтому при включенном `SOCKS_PROXY_URL` Telegram тоже пойдет через тот же локальный прокси.
 
-## 🔧 Что изменилось в коде
+Если нужен режим "OpenAI через прокси, Telegram напрямую", текущую конфигурацию нужно доработать отдельным флагом или отдельной переменной для OpenAI-only proxy.
 
-### config.py
+Практичный вариант для большинства случаев - оставить Telegram через тот же локальный SOCKS5:
 
-```python
-# ProxyAPI Configuration
-USE_PROXYAPI = os.getenv("USE_PROXYAPI", "true").lower() == "true"
-PROXYAPI_BASE_URL = "https://api.proxyapi.ru/openai/v1"
-OPENAI_BASE_URL = PROXYAPI_BASE_URL if USE_PROXYAPI else "https://api.openai.com/v1"
+```env
+SOCKS_PROXY_URL=socks5://127.0.0.1:1080
+HTTP_PROXY=socks5://127.0.0.1:1080
+HTTPS_PROXY=socks5://127.0.0.1:1080
 ```
 
-### services/openai_client.py
+## OpenAI-совместимый провайдер
 
-```python
-self.client = AsyncOpenAI(
-    api_key=OPENAI_API_KEY,
-    base_url=OPENAI_BASE_URL  # ProxyAPI или OpenAI
-)
+Если используется ProxyAPI или другой OpenAI-совместимый провайдер, меняются только ключ и `OPENAI_API_BASE`:
+
+```env
+OPENAI_API_KEY=your-provider-api-key-here
+OPENAI_API_BASE=https://provider.example.com/openai/v1
 ```
 
-### services/image_generation.py
+Для ProxyAPI укажите base URL из документации провайдера. Старый флаг `USE_PROXYAPI` больше не используется.
 
-```python
-# Автоматическое использование ProxyAPI для DALL-E
-api_url = f"{OPENAI_BASE_URL}/images/generations"
+## Зависимости для SOCKS
+
+Для работы SOCKS-прокси нужны зависимости из `requirements.txt`:
+
+```text
+httpx[socks]>=0.27.0
+PySocks>=1.7.1
+aiohttp-socks>=0.10.1
 ```
 
----
-
-## 💰 Стоимость
-
-ProxyAPI использует те же цены что и OpenAI, но оплата в рублях:
-
-### GPT-4o
-- **Входящие токены**: ~0.25₽ за 1K токенов
-- **Исходящие токены**: ~1₽ за 1K токенов
-
-### DALL-E 3
-- **Standard 1024×1024**: ~4₽ за изображение
-- **HD 1024×1024**: ~8₽ за изображение
-
-### Whisper (STT)
-- ~0.6₽ за минуту аудио
-
-### TTS
-- ~1.5₽ за 1M символов
-
-💡 **Актуальные цены**: [proxyapi.ru/docs/overview](https://proxyapi.ru/docs/overview)
-
----
-
-## 🔍 Проверка подключения
-
-### Способ 1: Логи бота
-
-При запуске бота проверьте логи:
-
-```
-OpenAI client initialized with ProxyAPI: https://api.proxyapi.ru/openai/v1
-```
-
-### Способ 2: Тестовый запрос
+Установить или обновить зависимости:
 
 ```bash
-python test_bot.py
+python -m pip install -r requirements.txt
 ```
 
-Если видите `✅ Bot is working!` - всё настроено правильно.
+Зачем нужны эти пакеты:
 
-### Способ 3: Проверка баланса
+- `httpx[socks]` - SOCKS-поддержка для OpenAI SDK и embeddings.
+- `PySocks` - SOCKS-поддержка для `requests`, которую использует `tiktoken` при загрузке tokenizer cache.
+- `aiohttp-socks` - SOCKS-поддержка для Telegram transport и DALL-E `aiohttp` запросов.
 
-Зайдите в личный кабинет [ProxyAPI](https://proxyapi.ru) и проверьте:
-- ✅ Ключ создан
-- ✅ Баланс положительный
-- ✅ Нет ошибок в логах использования
+## Проверка
 
----
+Проверить импорт OpenAI-клиента:
 
-## 📊 Сравнение: ProxyAPI vs Direct OpenAI
+```bash
+python -c "from services.openai_client import openai_client; print('OpenAI client OK')"
+```
 
-| Параметр | ProxyAPI | Direct OpenAI |
-|----------|----------|---------------|
-| **Доступ из России** | ✅ Да, без VPN | ❌ Нужен VPN |
-| **Оплата** | 💳 Российские карты, рубли | 💳 Иностранные карты |
-| **Стабильность** | ⚡ Через прокси Европы | 🌍 Прямое подключение |
-| **Цены** | 💰 В рублях, ~те же | 💵 В долларах |
-| **API совместимость** | ✅ 100% совместим | ✅ Оригинальный API |
-| **Скорость** | 🚀 Быстро (небольшая задержка) | 🚀 Максимальная скорость |
+Проверить RAG-поиск:
 
----
+```bash
+python - <<'PY'
+from rag.index import vector_index
+results = vector_index.similarity_search_with_score("test", k=1)
+print(f"RAG search OK, results={len(results)}")
+PY
+```
 
-## 🛡️ Безопасность
+Ожидаемые логи при включенном прокси:
 
-### Что знает ProxyAPI?
+```text
+OpenAI client initialized with base URL: https://api.openai.com/v1
+OpenAI proxy enabled
+```
 
-ProxyAPI - это прокси-сервис:
-- ✅ Видит ваши запросы к OpenAI
-- ✅ Перенаправляет их через свои серверы
-- ❌ НЕ сохраняет содержимое запросов (согласно политике)
+## Частые ошибки
 
-### Рекомендации:
+### Using SOCKS proxy, but the 'socksio' package is not installed
 
-1. **Не передавайте конфиденциальные данные** через бота
-2. **Используйте для личных проектов** и некритичных данных
-3. **Читайте политику конфиденциальности** ProxyAPI
-4. **Следите за балансом** чтобы избежать неожиданных трат
+Установите зависимости с SOCKS extras:
 
----
+```bash
+python -m pip install "httpx[socks]"
+```
 
-## 🔄 Переключение между ProxyAPI и OpenAI
+### Missing dependencies for SOCKS support
 
-### Использовать ProxyAPI (по умолчанию)
+Обычно это означает, что `requests` пытается идти через SOCKS, но не установлен `PySocks`:
+
+```bash
+python -m pip install PySocks
+```
+
+### Connection timeout
+
+Проверьте, что sing-box запущен и слушает нужный порт:
+
+```bash
+ss -ltnp | grep 1080
+```
+
+Также убедитесь, что URL в `.env` совпадает с портом sing-box:
 
 ```env
-USE_PROXYAPI=true
-OPENAI_API_KEY=ваш-ключ-proxyapi
+SOCKS_PROXY_URL=socks5://127.0.0.1:1080
 ```
 
-### Использовать Direct OpenAI (нужен VPN)
+## Переключение между режимами
 
-```env
-USE_PROXYAPI=false
-OPENAI_API_KEY=sk-вашключоpenai
-```
-
-### Без изменения кода!
-
-Просто измените `.env` и перезапустите бота:
+После любого изменения `.env` перезапустите бота:
 
 ```bash
 python main.py
 ```
 
----
-
-## 🎯 Поддерживаемые функции
-
-Все функции бота работают через ProxyAPI:
-
-- ✅ **Генерация текста** (GPT-4o, GPT-4o-mini)
-- ✅ **Генерация изображений** (DALL-E 3)
-- ✅ **Анализ изображений** (GPT-4 Vision)
-- ✅ **Распознавание речи** (Whisper)
-- ✅ **Синтез речи** (TTS)
-- ✅ **RAG** (работа с базой знаний)
-- ✅ **Все режимы бота** (text, voice, vision, rag)
-
----
-
-## ❓ FAQ
-
-### В: Нужно ли менять код?
-
-**О:** Нет! Просто измените ключ в `.env` на ключ от ProxyAPI.
-
-### В: Будет ли работать без VPN?
-
-**О:** Да! ProxyAPI специально для этого и создан.
-
-### В: Какие карты принимаются?
-
-**О:** Российские карты (Мир, Visa, MasterCard российских банков).
-
-### В: Можно ли вернуться на обычный OpenAI?
-
-**О:** Да, просто установите `USE_PROXYAPI=false` и используйте ключ OpenAI.
-
-### В: Безопасно ли использовать ProxyAPI?
-
-**О:** Для некритичных данных - да. Читайте политику конфиденциальности.
-
-### В: Работают ли все модели?
-
-**О:** Да, все модели OpenAI доступны через ProxyAPI.
-
----
-
-## 🚨 Возможные проблемы
-
-### Ошибка: "Invalid API key"
-
-**Решение:**
-1. Проверьте что в `.env` указан ключ от ProxyAPI, а не от OpenAI
-2. Проверьте что ключ скопирован полностью
-3. Проверьте баланс на ProxyAPI
-
-### Ошибка: "Connection timeout"
-
-**Решение:**
-1. Проверьте интернет-соединение
-2. Попробуйте позже (возможны технические работы)
-3. Проверьте статус на [proxyapi.ru](https://proxyapi.ru)
-
-### Изображения не генерируются
-
-**Решение:**
-1. Проверьте баланс (DALL-E стоит дороже)
-2. Проверьте логи: `tail -f bot.log`
-3. Убедитесь что `USE_PROXYAPI=true`
-
-### Медленная работа
-
-**Решение:**
-1. Это нормально - небольшая задержка из-за прокси
-2. Обычно задержка 100-300мс
-3. Если очень медленно - проверьте интернет
-
----
-
-## 📞 Поддержка
-
-### ProxyAPI
-- 🌐 Сайт: [proxyapi.ru](https://proxyapi.ru)
-- 📚 Документация: [proxyapi.ru/docs/overview](https://proxyapi.ru/docs/overview)
-- 📧 Контакты: на сайте ProxyAPI
-
-### Этот проект
-- 📖 Документация: `docs/`
-- 🐛 Проблемы: Создайте issue
-- 💬 Вопросы: Смотрите документацию
-
----
-
-## 📚 Дополнительные ресурсы
-
-- [Документация OpenAI API](https://platform.openai.com/docs)
-- [Документация ProxyAPI](https://proxyapi.ru/docs/overview)
-- [Условия использования ProxyAPI](https://proxyapi.ru/terms)
-- [Политика конфиденциальности](https://proxyapi.ru/privacy)
-
----
-
-## ✅ Checklist настройки
-
-- [ ] Зарегистрирован на [proxyapi.ru](https://proxyapi.ru)
-- [ ] Пополнен баланс
-- [ ] Создан API ключ
-- [ ] Ключ добавлен в `.env`
-- [ ] `USE_PROXYAPI=true` в `.env`
-- [ ] Бот запускается без ошибок
-- [ ] Тестовый запрос работает
-- [ ] Генерация изображений работает
-
----
-
-**Готово! Теперь ваш бот работает через ProxyAPI из России без VPN! 🎉**
-
----
-
-*Последнее обновление: 9 декабря 2024*
-
+Код менять не нужно: все токены, endpoint и proxy читаются из переменных окружения.

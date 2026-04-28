@@ -45,8 +45,8 @@
 - Анализ изображений с помощью Vision-модели.
 - Генерация изображений по текстовому описанию.
 - RAG-режим: ответы на основе локальных документов из `data/documents/`.
-- Поддержка `ProxyAPI` для OpenAI-совместимого endpoint.
-- Telegram proxy через `TELEGRAM_PROXY_URL`.
+- Настраиваемый OpenAI-совместимый endpoint через `OPENAI_API_BASE`.
+- Поддержка локального SOCKS5-прокси через `SOCKS_PROXY_URL` для OpenAI, RAG embeddings, DALL-E и Telegram.
 - Автоматическое индексирование документов при старте, если база еще не создана.
 - Набор тестов и CI workflow для GitHub Actions.
 
@@ -106,9 +106,9 @@ cp .env.example .env
 Минимальная конфигурация:
 
 ```env
-TELEGRAM_BOT_TOKEN=your_telegram_bot_token_here
-OPENAI_API_KEY=your_openai_or_proxyapi_key_here
-USE_PROXYAPI=true
+TELEGRAM_BOT_TOKEN=your-telegram-bot-token-here
+OPENAI_API_KEY=sk-your-openai-api-key-here
+OPENAI_API_BASE=https://api.openai.com/v1
 BOT_MODE=rag
 DEFAULT_VOICE=alloy
 LOG_LEVEL=INFO
@@ -124,6 +124,26 @@ LOG_LEVEL=INFO
 - `BOT_MODE` - стартовый режим: `text`, `voice`, `vision` или `rag`.
 - `DB_PATH` - путь к локальному хранилищу embeddings.
 - `LOG_LEVEL` - уровень логирования.
+
+### Прокси через sing-box
+
+Если OpenAI недоступен напрямую, поднимите локальный SOCKS5-прокси, например sing-box на `127.0.0.1:1080`, и добавьте в `.env`:
+
+```env
+SOCKS_PROXY_URL=socks5://127.0.0.1:1080
+HTTP_PROXY=socks5://127.0.0.1:1080
+HTTPS_PROXY=socks5://127.0.0.1:1080
+```
+
+Эти настройки используются для OpenAI SDK, RAG embeddings, DALL-E-запросов и, если не задан `TELEGRAM_PROXY_URL`, для Telegram Bot API.
+
+На сервере без блокировок можно оставить proxy-переменные пустыми:
+
+```env
+SOCKS_PROXY_URL=
+HTTP_PROXY=
+HTTPS_PROXY=
+```
 
 ## ▶️ Запуск
 
@@ -210,10 +230,11 @@ pytest
 - `pyTelegramBotAPI`
 - `OpenAI Python SDK`
 - `LangChain`
-- `ChromaDB`
+- `ChromaDB` / `langchain-chroma`
 - `pydub`
 - `FFmpeg`
 - `aiohttp`
+- `httpx` с SOCKS-поддержкой
 - `pytest`
 - `GitHub Actions`
 
@@ -242,13 +263,13 @@ git push -u origin main
 
 - `START_HERE.md` - подробный быстрый старт.
 - `RAG_GUIDE.md` - настройка базы знаний.
-- `PROXYAPI_SETUP.md` - настройка ProxyAPI.
+- `PROXYAPI_SETUP.md` - настройка OpenAI-совместимого endpoint и SOCKS-прокси.
 - `VISUAL_GUIDE.md` - визуальное описание проекта.
 - `SUMMARY_CHANGES.md` - сводка изменений.
 
 ## ⚠️ Ограничения
 
-- Для реальной работы нужны токен Telegram-бота и OpenAI/ProxyAPI ключ.
+- Для реальной работы нужны токен Telegram-бота и OpenAI/OpenAI-совместимый API ключ.
 - Голосовые функции требуют установленный `FFmpeg`.
 - Индекс RAG создается локально и не хранится в репозитории.
 - Интеграционные тесты с реальным API пропущены по умолчанию, чтобы не тратить средства.

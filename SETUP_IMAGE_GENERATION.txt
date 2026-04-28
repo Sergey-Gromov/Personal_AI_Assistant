@@ -21,9 +21,16 @@
 
 Убедитесь что в файле .env есть OPENAI_API_KEY:
 
-    OPENAI_API_KEY=sk-proj-...
+    OPENAI_API_KEY=sk-your-openai-api-key-here
+    OPENAI_API_BASE=https://api.openai.com/v1
 
 Если нет - создайте ключ на: https://platform.openai.com/api-keys
+
+Если OpenAI недоступен напрямую, включите локальный SOCKS5-прокси:
+
+    SOCKS_PROXY_URL=socks5://127.0.0.1:1080
+    HTTP_PROXY=socks5://127.0.0.1:1080
+    HTTPS_PROXY=socks5://127.0.0.1:1080
 
 
 ┌──────────────────────────────────────────────────────────────┐
@@ -144,6 +151,12 @@ SETUP_IMAGE_GENERATION.txt        - Этот файл
 
 Ошибка: "Module aiohttp not found"
     → Выполните: pip install aiohttp>=3.9.0
+
+Ошибка: "Using SOCKS proxy, but the 'socksio' package is not installed"
+    → Выполните: pip install "httpx[socks]"
+
+Ошибка: "Missing dependencies for SOCKS support"
+    → Выполните: pip install PySocks
 
 Изображение не такое как ожидали
     → Добавьте больше деталей в описание
