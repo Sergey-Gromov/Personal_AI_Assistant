@@ -6,11 +6,12 @@ Creates and manages embeddings using ChromaDB.
 from typing import List, Optional
 from pathlib import Path
 import chromadb
+import httpx
 from chromadb.config import Settings
 from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 
-from config import DATA_DIR, OPENAI_API_KEY, OPENAI_BASE_URL, DOCUMENTS_DIR
+from config import DATA_DIR, OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_PROXY_URL, DOCUMENTS_DIR
 from utils.logging import logger
 from rag.loader import document_loader
 
@@ -32,10 +33,15 @@ class VectorIndex:
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         
         # Initialize embeddings
-        self.embeddings = OpenAIEmbeddings(
-            openai_api_key=OPENAI_API_KEY,
-            base_url=OPENAI_BASE_URL
-        )
+        embedding_kwargs = {
+            "openai_api_key": OPENAI_API_KEY,
+            "base_url": OPENAI_BASE_URL,
+        }
+        if OPENAI_PROXY_URL:
+            embedding_kwargs["http_client"] = httpx.Client(proxy=OPENAI_PROXY_URL)
+            embedding_kwargs["http_async_client"] = httpx.AsyncClient(proxy=OPENAI_PROXY_URL)
+
+        self.embeddings = OpenAIEmbeddings(**embedding_kwargs)
         
         # Initialize or load vector store
         self.vectorstore = None

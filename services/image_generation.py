@@ -9,14 +9,37 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
 import json
+from urllib.parse import urlparse
 
-from config import OPENAI_API_KEY, OPENAI_BASE_URL, USE_PROXYAPI, DATA_DIR
+from config import OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_PROXY_URL, DATA_DIR
 from utils.logging import logger
 
 
 # Create temp directory for generated images
 GENERATED_IMAGES_DIR = DATA_DIR / "generated_images"
 GENERATED_IMAGES_DIR.mkdir(exist_ok=True)
+
+
+def _is_socks_proxy(proxy_url: str) -> bool:
+    """Return True when proxy URL uses SOCKS protocol."""
+    scheme = urlparse(proxy_url).scheme.lower()
+    return scheme in {"socks4", "socks4a", "socks5", "socks5h"}
+
+
+def _create_openai_session() -> aiohttp.ClientSession:
+    """Create aiohttp session configured for OpenAI requests via optional proxy."""
+    if OPENAI_PROXY_URL and _is_socks_proxy(OPENAI_PROXY_URL):
+        from aiohttp_socks import ProxyConnector
+
+        return aiohttp.ClientSession(connector=ProxyConnector.from_url(OPENAI_PROXY_URL))
+
+    return aiohttp.ClientSession(trust_env=True)
+
+
+def _aiohttp_proxy_kwargs() -> Dict[str, str]:
+    if OPENAI_PROXY_URL and not _is_socks_proxy(OPENAI_PROXY_URL):
+        return {"proxy": OPENAI_PROXY_URL}
+    return {}
 
 
 async def detect_image_generation_intent(
@@ -167,11 +190,12 @@ async def generate_image(
         api_url = f"{OPENAI_BASE_URL}/images/generations"
         
         # Make API request
-        async with aiohttp.ClientSession() as session:
+        async with _create_openai_session() as session:
             async with session.post(
                 api_url,
                 headers=headers,
-                json=payload
+                json=payload,
+                **_aiohttp_proxy_kwargs()
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
@@ -220,8 +244,8 @@ async def download_image(url: str) -> Path:
         filepath = GENERATED_IMAGES_DIR / filename
         
         # Download image
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
+        async with _create_openai_session() as session:
+            async with session.get(url, **_aiohttp_proxy_kwargs()) as response:
                 if response.status != 200:
                     raise Exception(f"Failed to download image: {response.status}")
                 
@@ -273,11 +297,12 @@ async def generate_image_variations(
         api_url = f"{OPENAI_BASE_URL}/images/variations"
         
         # Make API request
-        async with aiohttp.ClientSession() as session:
+        async with _create_openai_session() as session:
             async with session.post(
                 api_url,
                 headers=headers,
-                data=data
+                data=data,
+                **_aiohttp_proxy_kwargs()
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()

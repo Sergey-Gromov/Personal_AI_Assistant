@@ -4,6 +4,7 @@ Provides methods for text generation, vision, STT, and TTS.
 """
 
 from typing import List, Dict, Optional
+import httpx
 from openai import AsyncOpenAI
 from pathlib import Path
 import time
@@ -11,7 +12,7 @@ import time
 from config import (
     OPENAI_API_KEY,
     OPENAI_BASE_URL,
-    USE_PROXYAPI,
+    OPENAI_PROXY_URL,
     GPT_MODEL,
     WHISPER_MODEL,
     TTS_MODEL,
@@ -27,17 +28,20 @@ class OpenAIClient:
     
     def __init__(self):
         """Initialize the OpenAI client."""
-        self.client = AsyncOpenAI(
-            api_key=OPENAI_API_KEY,
-            base_url=OPENAI_BASE_URL
-        )
+        client_kwargs = {
+            "api_key": OPENAI_API_KEY,
+            "base_url": OPENAI_BASE_URL,
+        }
+        if OPENAI_PROXY_URL:
+            client_kwargs["http_client"] = httpx.AsyncClient(proxy=OPENAI_PROXY_URL)
+
+        self.client = AsyncOpenAI(**client_kwargs)
         
-        if USE_PROXYAPI:
-            logger.info(f"OpenAI client initialized with ProxyAPI: {OPENAI_BASE_URL}")
-        else:
-            logger.info("OpenAI client initialized with direct API")
+        logger.info("OpenAI client initialized with base URL: %s", OPENAI_BASE_URL)
+        if OPENAI_PROXY_URL:
+            logger.info("OpenAI proxy enabled")
         
-        self.use_proxyapi = USE_PROXYAPI
+        self.proxy_url = OPENAI_PROXY_URL
     
     async def generate_text_response(
         self,

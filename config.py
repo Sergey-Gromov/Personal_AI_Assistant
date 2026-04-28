@@ -17,7 +17,6 @@ BASE_DIR = Path(__file__).parent
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 if not TELEGRAM_BOT_TOKEN:
     raise ValueError("TELEGRAM_BOT_TOKEN is not set in .env file")
-TELEGRAM_PROXY_URL = os.getenv("TELEGRAM_PROXY_URL")
 TELEGRAM_REQUEST_TIMEOUT = int(os.getenv("TELEGRAM_REQUEST_TIMEOUT", "90"))
 
 # OpenAI Configuration
@@ -25,10 +24,19 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY is not set in .env file")
 
-# ProxyAPI Configuration (для работы в России без VPN)
-USE_PROXYAPI = os.getenv("USE_PROXYAPI", "true").lower() == "true"
-PROXYAPI_BASE_URL = "https://api.proxyapi.ru/openai/v1"
-OPENAI_BASE_URL = PROXYAPI_BASE_URL if USE_PROXYAPI else "https://api.openai.com/v1"
+OPENAI_API_BASE = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1").rstrip("/")
+OPENAI_BASE_URL = OPENAI_API_BASE
+
+# Local sing-box proxy on 127.0.0.1:1080 can be configured in .env.
+SOCKS_PROXY_URL = os.getenv("SOCKS_PROXY_URL")
+HTTP_PROXY = os.getenv("HTTP_PROXY")
+HTTPS_PROXY = os.getenv("HTTPS_PROXY")
+OPENAI_PROXY_URL = SOCKS_PROXY_URL or HTTPS_PROXY or HTTP_PROXY
+TELEGRAM_PROXY_URL = os.getenv("TELEGRAM_PROXY_URL") or SOCKS_PROXY_URL
+
+if SOCKS_PROXY_URL:
+    os.environ.setdefault("HTTP_PROXY", SOCKS_PROXY_URL)
+    os.environ.setdefault("HTTPS_PROXY", SOCKS_PROXY_URL)
 
 # Bot Modes
 class BotMode:
