@@ -26,7 +26,7 @@ def temp_dir(tmp_path):
 @pytest.fixture(autouse=True)
 def setup_env(monkeypatch):
     """Setup test environment variables."""
-    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "test_token_12345")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "123456789:TEST_TOKEN_FOR_CI")
     monkeypatch.setenv("OPENAI_API_KEY", "test_openai_key_12345")
     monkeypatch.setenv("LOG_LEVEL", "ERROR")  # Reduce logging in tests
 
